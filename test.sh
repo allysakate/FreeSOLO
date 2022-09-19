@@ -5,7 +5,6 @@
 # https://github.com/NVlabs/FreeSOLO/blob/main/LICENSE
 
 python train_net.py \
-	--dist-url tcp://127.0.0.1:$(( RANDOM % 1000 + 50000 )) \
 	--eval-only \
 	--num-gpus 1 \
 	--config configs/freesolo/freesolo_30k.yaml \
