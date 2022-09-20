@@ -156,3 +156,12 @@ register_coco_instances("coco_2017_train_unlabeled_freesolo_pl",
                         {}, 
                         os.path.join(_root, "coco/annotations/instances_train2017_unlabeled2017_freesolo_pl.json"), 
                         os.path.join(_root, "coco/"))
+
+register_coco_instances("mots_train",
+                        {},
+                        os.path.join(_root, "mots/annotations/mots_train.json"), 
+                        os.path.join(_root, "mots/mots_train"))
+register_coco_instances("mots_val",
+                        {},
+                        os.path.join(_root, "mots/annotations/mots_val.json"), 
+                        os.path.join(_root, "mots/mots_val"))

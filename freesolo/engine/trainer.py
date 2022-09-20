@@ -195,6 +195,7 @@ class BaselineTrainer(DefaultTrainer):
         data_q = self.copy_and_paste(copy.deepcopy(data_k[::-1]), data_q)
         data_q.extend(data_k)
         record_dict = self.model(data_q, branch="supervised")
+        torch.cuda.empty_cache()
 
         loss_dict = {}
         for key in record_dict.keys():
