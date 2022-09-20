@@ -42,6 +42,8 @@ from freesolo.engine.trainer import BaselineTrainer
 import freesolo.data.datasets.builtin
 from freesolo.modeling.solov2 import PseudoSOLOv2
 
+import warnings
+warnings.simplefilter("ignore", UserWarning)
 
 def setup(args):
     """
