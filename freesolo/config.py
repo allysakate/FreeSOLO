@@ -55,7 +55,7 @@ def add_solo_config(cfg):
     _C.MODEL.SOLOV2.TYPE_DCN = 'DCN'
     _C.MODEL.SOLOV2.NUM_GRIDS = [40, 36, 24, 16, 12]
     # Number of foreground classes.
-    _C.MODEL.SOLOV2.NUM_CLASSES = 80
+    _C.MODEL.SOLOV2.NUM_CLASSES = 2
     _C.MODEL.SOLOV2.NUM_KERNELS = 256
     _C.MODEL.SOLOV2.NORM = "GN"
     _C.MODEL.SOLOV2.USE_COORD_CONV = True

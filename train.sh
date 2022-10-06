@@ -5,7 +5,7 @@
 # https://github.com/NVlabs/FreeSOLO/blob/main/LICENSE
 
 #export GLOO_SOCKET_IFNAME=eth0
-python train_net.py \
+export CUDA_VISIBLE_DEVICES=3 && python train_net.py \
 	--num-gpus 1 \
 	--config configs/freesolo/freesolo_30k.yaml \
-	OUTPUT_DIR training_dir/FreeSOLO\
+	OUTPUT_DIR training_dir/FreeSOLOv1\
