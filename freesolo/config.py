@@ -7,7 +7,7 @@
 # -------------------------------------------------------------------------
 # Copyright (c) 2019 the AdelaiDet authors
 # All rights reserved.
-#  
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
 #
@@ -44,7 +44,13 @@ def add_solo_config(cfg):
     # Instance hyper-parameters
     _C.MODEL.SOLOV2.INSTANCE_IN_FEATURES = ["p2", "p3", "p4", "p5", "p6"]
     _C.MODEL.SOLOV2.FPN_INSTANCE_STRIDES = [8, 8, 16, 32, 32]
-    _C.MODEL.SOLOV2.FPN_SCALE_RANGES = ((1, 96), (48, 192), (96, 384), (192, 768), (384, 2048))
+    _C.MODEL.SOLOV2.FPN_SCALE_RANGES = (
+        (1, 96),
+        (48, 192),
+        (96, 384),
+        (192, 768),
+        (384, 2048),
+    )
     _C.MODEL.SOLOV2.SIGMA = 0.2
     # Channel size for the instance head.
     _C.MODEL.SOLOV2.INSTANCE_IN_CHANNELS = 256
@@ -52,7 +58,7 @@ def add_solo_config(cfg):
     # Convolutions to use in the instance head.
     _C.MODEL.SOLOV2.NUM_INSTANCE_CONVS = 4
     _C.MODEL.SOLOV2.USE_DCN_IN_INSTANCE = False
-    _C.MODEL.SOLOV2.TYPE_DCN = 'DCN'
+    _C.MODEL.SOLOV2.TYPE_DCN = "DCN"
     _C.MODEL.SOLOV2.NUM_GRIDS = [40, 36, 24, 16, 12]
     # Number of foreground classes.
     _C.MODEL.SOLOV2.NUM_CLASSES = 80
@@ -93,4 +99,3 @@ def add_solo_config(cfg):
 
     # Flag for Free Mask
     _C.MODEL.SOLOV2.IS_FREEMASK = False
-

@@ -7,7 +7,7 @@
 # -------------------------------------------------------------------------
 # Copyright (c) 2019 the AdelaiDet authors
 # All rights reserved.
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
 #
@@ -40,15 +40,24 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from detectron2.layers import ShapeSpec, batched_nms, cat, paste_masks_in_image
+from detectron2.layers import ShapeSpec  # , batched_nms, cat, paste_masks_in_image
 from detectron2.modeling.backbone import build_backbone
 from detectron2.modeling.meta_arch.build import META_ARCH_REGISTRY
 from detectron2.structures import Boxes, ImageList, Instances
 from detectron2.utils.logger import log_first_n
 from fvcore.nn import sigmoid_focal_loss_jit
 
-from .utils import imrescale, center_of_mass, point_nms, mask_nms, matrix_nms, dice_coefficient, compute_pairwise_term
-from .loss import dice_loss, FocalLoss
+from .utils import (
+    imrescale,
+    center_of_mass,
+    point_nms,
+    mask_nms,
+    matrix_nms,
+    dice_coefficient,
+    compute_pairwise_term,
+)
+
+# from .loss import dice_loss, FocalLoss
 
 __all__ = ["SOLOv2"]
 
@@ -116,9 +125,9 @@ class SOLOv2(nn.Module):
             for p in self.backbone.parameters():
                 p.requires_grad = False
             print("froze backbone parameters")
-            #for p in self.mask_head.parameters():
+            # for p in self.mask_head.parameters():
             #    p.requires_grad = False
-            #print("froze mask head parameters")
+            # print("froze mask head parameters")
 
         # loss
         self.ins_loss_weight = cfg.MODEL.SOLOV2.LOSS.DICE_WEIGHT
@@ -160,14 +169,15 @@ class SOLOv2(nn.Module):
             gt_instances = [x["instances"].to(self.device) for x in batched_inputs]
         elif "targets" in batched_inputs[0]:
             log_first_n(
-                logging.WARN, "'targets' in the model inputs is now renamed to 'instances'!", n=10
+                logging.WARN,
+                "'targets' in the model inputs is now renamed to 'instances'!",
+                n=10,
             )
             gt_instances = [x["targets"].to(self.device) for x in batched_inputs]
         else:
             gt_instances = None
 
         features = self.backbone(images.tensor)
-
 
         # ins branch
         ins_features = [features[f] for f in self.instance_in_features]
@@ -189,10 +199,14 @@ class SOLOv2(nn.Module):
             return losses
         else:
             # point nms.
-            cate_pred = [point_nms(cate_p.sigmoid(), kernel=2).permute(0, 2, 3, 1)
-                         for cate_p in cate_pred]
+            cate_pred = [
+                point_nms(cate_p.sigmoid(), kernel=2).permute(0, 2, 3, 1)
+                for cate_p in cate_pred
+            ]
             # do inference for results.
-            results = self.inference(cate_pred, kernel_pred, mask_pred, images.image_sizes, batched_inputs)
+            results = self.inference(
+                cate_pred, kernel_pred, mask_pred, images.image_sizes, batched_inputs
+            )
             return results
 
     def preprocess_image(self, batched_inputs):
@@ -206,60 +220,97 @@ class SOLOv2(nn.Module):
 
     @torch.no_grad()
     def get_ground_truth(self, gt_instances, mask_feat_size=None):
-        ins_label_list, cate_label_list, ins_ind_label_list, grid_order_list, cate_soft_label_list = [], [], [], [], []
-        if len(gt_instances) and gt_instances[0].has('image_color_similarity'):
-            image_color_similarity_list = [gt_instance.image_color_similarity for gt_instance in gt_instances]
+        (
+            ins_label_list,
+            cate_label_list,
+            ins_ind_label_list,
+            grid_order_list,
+            cate_soft_label_list,
+        ) = ([], [], [], [], [])
+        if len(gt_instances) and gt_instances[0].has("image_color_similarity"):
+            image_color_similarity_list = [
+                gt_instance.image_color_similarity for gt_instance in gt_instances
+            ]
         else:
             image_color_similarity_list = []
 
         for img_idx in range(len(gt_instances)):
-            cur_ins_label_list, cur_cate_label_list, \
-            cur_ins_ind_label_list, cur_grid_order_list, cur_cate_soft_label_list = \
-                self.get_ground_truth_single(img_idx, gt_instances,
-                                             mask_feat_size=mask_feat_size)
+            (
+                cur_ins_label_list,
+                cur_cate_label_list,
+                cur_ins_ind_label_list,
+                cur_grid_order_list,
+                cur_cate_soft_label_list,
+            ) = self.get_ground_truth_single(
+                img_idx, gt_instances, mask_feat_size=mask_feat_size
+            )
             ins_label_list.append(cur_ins_label_list)
             cate_label_list.append(cur_cate_label_list)
             ins_ind_label_list.append(cur_ins_ind_label_list)
             grid_order_list.append(cur_grid_order_list)
             cate_soft_label_list.append(cur_cate_soft_label_list)
-        return ins_label_list, cate_label_list, ins_ind_label_list, grid_order_list, cate_soft_label_list, image_color_similarity_list
+        return (
+            ins_label_list,
+            cate_label_list,
+            ins_ind_label_list,
+            grid_order_list,
+            cate_soft_label_list,
+            image_color_similarity_list,
+        )
 
     def get_ground_truth_single(self, img_idx, gt_instances, mask_feat_size):
         gt_bboxes_raw = gt_instances[img_idx].gt_boxes.tensor
         gt_labels_raw = gt_instances[img_idx].gt_classes
         gt_masks_raw = gt_instances[img_idx].gt_masks
         device = gt_labels_raw.device
-        if hasattr(gt_instances[img_idx], 'gt_embs'):
+        if hasattr(gt_instances[img_idx], "gt_embs"):
             gt_embs_raw = gt_instances[img_idx].gt_embs
-        else: # empty soft labels
-            gt_embs_raw = torch.zeros([gt_labels_raw.shape[0], self.num_embs], device=device)
+        else:  # empty soft labels
+            gt_embs_raw = torch.zeros(
+                [gt_labels_raw.shape[0], self.num_embs], device=device
+            )
         if not torch.is_tensor(gt_masks_raw):
             gt_masks_raw = gt_masks_raw.tensor
 
         # ins
-        gt_areas = torch.sqrt((gt_bboxes_raw[:, 2] - gt_bboxes_raw[:, 0]) * (
-                gt_bboxes_raw[:, 3] - gt_bboxes_raw[:, 1]))
+        gt_areas = torch.sqrt(
+            (gt_bboxes_raw[:, 2] - gt_bboxes_raw[:, 0])
+            * (gt_bboxes_raw[:, 3] - gt_bboxes_raw[:, 1])
+        )
 
         ins_label_list = []
         cate_label_list = []
         ins_ind_label_list = []
         grid_order_list = []
         emb_label_list = []
-        for (lower_bound, upper_bound), stride, num_grid \
-                in zip(self.scale_ranges, self.strides, self.num_grids):
+        for (lower_bound, upper_bound), stride, num_grid in zip(
+            self.scale_ranges, self.strides, self.num_grids
+        ):
 
-            hit_indices = ((gt_areas >= lower_bound) & (gt_areas <= upper_bound)).nonzero().flatten()
+            hit_indices = (
+                ((gt_areas >= lower_bound) & (gt_areas <= upper_bound))
+                .nonzero()
+                .flatten()
+            )
             num_ins = len(hit_indices)
 
             ins_label = []
             grid_order = []
-            cate_label = torch.zeros([num_grid, num_grid], dtype=torch.int64, device=device)
+            cate_label = torch.zeros(
+                [num_grid, num_grid], dtype=torch.int64, device=device
+            )
             cate_label = torch.fill_(cate_label, self.num_classes)
-            ins_ind_label = torch.zeros([num_grid ** 2], dtype=torch.bool, device=device)
+            ins_ind_label = torch.zeros(
+                [num_grid**2], dtype=torch.bool, device=device
+            )
             emb_label = torch.zeros([num_grid, num_grid, self.num_embs], device=device)
 
             if num_ins == 0:
-                ins_label = torch.zeros([0, mask_feat_size[0], mask_feat_size[1]], dtype=torch.uint8, device=device)
+                ins_label = torch.zeros(
+                    [0, mask_feat_size[0], mask_feat_size[1]],
+                    dtype=torch.uint8,
+                    device=device,
+                )
                 ins_label_list.append(ins_label)
                 cate_label_list.append(cate_label)
                 ins_ind_label_list.append(ins_ind_label)
@@ -280,47 +331,87 @@ class SOLOv2(nn.Module):
 
             output_stride = 4
             gt_masks = gt_masks.permute(1, 2, 0).to(dtype=torch.uint8).cpu().numpy()
-            gt_masks = imrescale(gt_masks, scale=1. / output_stride)
+            gt_masks = imrescale(gt_masks, scale=1.0 / output_stride)
             if len(gt_masks.shape) == 2:
                 gt_masks = gt_masks[..., None]
-            gt_masks = torch.from_numpy(gt_masks).to(dtype=torch.uint8, device=device).permute(2, 0, 1)
-            for seg_mask, gt_label, gt_emb, half_h, half_w, center_h, center_w, valid_mask_flag in zip(gt_masks, gt_labels, gt_embs,
-                                                                                               half_hs, half_ws,
-                                                                                               center_hs, center_ws,
-                                                                                               valid_mask_flags):
+            gt_masks = (
+                torch.from_numpy(gt_masks)
+                .to(dtype=torch.uint8, device=device)
+                .permute(2, 0, 1)
+            )
+            for (
+                seg_mask,
+                gt_label,
+                gt_emb,
+                half_h,
+                half_w,
+                center_h,
+                center_w,
+                valid_mask_flag,
+            ) in zip(
+                gt_masks,
+                gt_labels,
+                gt_embs,
+                half_hs,
+                half_ws,
+                center_hs,
+                center_ws,
+                valid_mask_flags,
+            ):
                 if not valid_mask_flag:
                     continue
                 upsampled_size = (mask_feat_size[0] * 4, mask_feat_size[1] * 4)
-                coord_w = int((center_w / upsampled_size[1]) // (1. / num_grid))
-                coord_h = int((center_h / upsampled_size[0]) // (1. / num_grid))
+                coord_w = int((center_w / upsampled_size[1]) // (1.0 / num_grid))
+                coord_h = int((center_h / upsampled_size[0]) // (1.0 / num_grid))
 
                 # left, top, right, down
-                top_box = max(0, int(((center_h - half_h) / upsampled_size[0]) // (1. / num_grid)))
-                down_box = min(num_grid - 1, int(((center_h + half_h) / upsampled_size[0]) // (1. / num_grid)))
-                left_box = max(0, int(((center_w - half_w) / upsampled_size[1]) // (1. / num_grid)))
-                right_box = min(num_grid - 1, int(((center_w + half_w) / upsampled_size[1]) // (1. / num_grid)))
+                top_box = max(
+                    0,
+                    int(((center_h - half_h) / upsampled_size[0]) // (1.0 / num_grid)),
+                )
+                down_box = min(
+                    num_grid - 1,
+                    int(((center_h + half_h) / upsampled_size[0]) // (1.0 / num_grid)),
+                )
+                left_box = max(
+                    0,
+                    int(((center_w - half_w) / upsampled_size[1]) // (1.0 / num_grid)),
+                )
+                right_box = min(
+                    num_grid - 1,
+                    int(((center_w + half_w) / upsampled_size[1]) // (1.0 / num_grid)),
+                )
 
                 top = max(top_box, coord_h - 1)
                 down = min(down_box, coord_h + 1)
                 left = max(coord_w - 1, left_box)
                 right = min(right_box, coord_w + 1)
 
-                cate_label[top:(down + 1), left:(right + 1)] = gt_label
-                emb_label[top:(down + 1), left:(right + 1)] = gt_emb
-                #cate_label[coord_h, coord_w] = gt_label
-                #cate_soft_label[coord_h, coord_w] = gt_soft_label
+                cate_label[top : (down + 1), left : (right + 1)] = gt_label
+                emb_label[top : (down + 1), left : (right + 1)] = gt_emb
+                # cate_label[coord_h, coord_w] = gt_label
+                # cate_soft_label[coord_h, coord_w] = gt_soft_label
                 for i in range(top, down + 1):
                     for j in range(left, right + 1):
                         label = int(i * num_grid + j)
 
-                        cur_ins_label = torch.zeros([mask_feat_size[0], mask_feat_size[1]], dtype=torch.uint8,
-                                                    device=device)
-                        cur_ins_label[:seg_mask.shape[0], :seg_mask.shape[1]] = seg_mask
+                        cur_ins_label = torch.zeros(
+                            [mask_feat_size[0], mask_feat_size[1]],
+                            dtype=torch.uint8,
+                            device=device,
+                        )
+                        cur_ins_label[
+                            : seg_mask.shape[0], : seg_mask.shape[1]
+                        ] = seg_mask
                         ins_label.append(cur_ins_label)
                         ins_ind_label[label] = True
                         grid_order.append(label)
             if len(ins_label) == 0:
-                ins_label = torch.zeros([0, mask_feat_size[0], mask_feat_size[1]], dtype=torch.uint8, device=device)
+                ins_label = torch.zeros(
+                    [0, mask_feat_size[0], mask_feat_size[1]],
+                    dtype=torch.uint8,
+                    device=device,
+                )
             else:
                 ins_label = torch.stack(ins_label, 0)
             ins_label_list.append(ins_label)
@@ -328,33 +419,61 @@ class SOLOv2(nn.Module):
             ins_ind_label_list.append(ins_ind_label)
             grid_order_list.append(grid_order)
             emb_label_list.append(emb_label)
-        return ins_label_list, cate_label_list, ins_ind_label_list, grid_order_list, emb_label_list
+        return (
+            ins_label_list,
+            cate_label_list,
+            ins_ind_label_list,
+            grid_order_list,
+            emb_label_list,
+        )
 
-    def loss(self, cate_preds, kernel_preds, emb_preds, ins_pred, targets, pseudo=False):
+    def loss(
+        self, cate_preds, kernel_preds, emb_preds, ins_pred, targets, pseudo=False
+    ):
         self._iter += 1
-        ins_label_list, cate_label_list, ins_ind_label_list, grid_order_list, emb_label_list, image_color_similarity_list = targets
+        (
+            ins_label_list,
+            cate_label_list,
+            ins_ind_label_list,
+            grid_order_list,
+            emb_label_list,
+            image_color_similarity_list,
+        ) = targets
 
         # ins
-        ins_labels = [torch.cat([ins_labels_level_img
-                                 for ins_labels_level_img in ins_labels_level], 0)
-                      for ins_labels_level in zip(*ins_label_list)]
+        ins_labels = [
+            torch.cat(
+                [ins_labels_level_img for ins_labels_level_img in ins_labels_level], 0
+            )
+            for ins_labels_level in zip(*ins_label_list)
+        ]
         if len(image_color_similarity_list):
             image_color_similarity = []
             for level_idx in range(len(ins_label_list[0])):
                 level_image_color_similarity = []
                 for img_idx in range(len(ins_label_list)):
                     num = ins_label_list[img_idx][level_idx].shape[0]
-                    cur_image_color_sim = image_color_similarity_list[img_idx][[0]].expand(num, -1, -1, -1)
+                    cur_image_color_sim = image_color_similarity_list[img_idx][
+                        [0]
+                    ].expand(num, -1, -1, -1)
                     level_image_color_similarity.append(cur_image_color_sim)
                 image_color_similarity.append(torch.cat(level_image_color_similarity))
         else:
             image_color_similarity = ins_labels.copy()
 
-
-        kernel_preds = [[kernel_preds_level_img.view(kernel_preds_level_img.shape[0], -1)[:, grid_orders_level_img]
-                         for kernel_preds_level_img, grid_orders_level_img in
-                         zip(kernel_preds_level, grid_orders_level)]
-                        for kernel_preds_level, grid_orders_level in zip(kernel_preds, zip(*grid_order_list))]
+        kernel_preds = [
+            [
+                kernel_preds_level_img.view(kernel_preds_level_img.shape[0], -1)[
+                    :, grid_orders_level_img
+                ]
+                for kernel_preds_level_img, grid_orders_level_img in zip(
+                    kernel_preds_level, grid_orders_level
+                )
+            ]
+            for kernel_preds_level, grid_orders_level in zip(
+                kernel_preds, zip(*grid_order_list)
+            )
+        ]
         # generate masks
         ins_pred_list = []
         for b_kernel_pred in kernel_preds:
@@ -368,7 +487,9 @@ class SOLOv2(nn.Module):
                 N, I = kernel_pred.shape
                 cur_ins_pred = cur_ins_pred.unsqueeze(0)
                 kernel_pred = kernel_pred.permute(1, 0).view(I, -1, 1, 1)
-                cur_ins_pred = F.conv2d(cur_ins_pred, kernel_pred, stride=1).view(-1, H, W)
+                cur_ins_pred = F.conv2d(cur_ins_pred, kernel_pred, stride=1).view(
+                    -1, H, W
+                )
                 b_mask_pred.append(cur_ins_pred)
             if len(b_mask_pred) == 0:
                 b_mask_pred = None
@@ -377,8 +498,12 @@ class SOLOv2(nn.Module):
             ins_pred_list.append(b_mask_pred)
 
         ins_ind_labels = [
-            torch.cat([ins_ind_labels_level_img.flatten()
-                       for ins_ind_labels_level_img in ins_ind_labels_level])
+            torch.cat(
+                [
+                    ins_ind_labels_level_img.flatten()
+                    for ins_ind_labels_level_img in ins_ind_labels_level
+                ]
+            )
             for ins_ind_labels_level in zip(*ins_ind_label_list)
         ]
         flatten_ins_ind_labels = torch.cat(ins_ind_labels)
@@ -389,19 +514,23 @@ class SOLOv2(nn.Module):
         loss_ins = []
         loss_ins_max = []
         loss_pairwise = []
-        for input, target, cur_image_color_similarity  in zip(ins_pred_list, ins_labels, image_color_similarity):
+        for input, target, cur_image_color_similarity in zip(
+            ins_pred_list, ins_labels, image_color_similarity
+        ):
             if input is None:
                 continue
             input_scores = torch.sigmoid(input)
-            box_target = target.max(dim=1, keepdim=True)[0].expand(-1, target.shape[1], -1) * target.max(dim=2, keepdim=True)[0].expand(-1, -1, target.shape[2])
+            box_target = target.max(dim=1, keepdim=True)[0].expand(
+                -1, target.shape[1], -1
+            ) * target.max(dim=2, keepdim=True)[0].expand(-1, -1, target.shape[2])
 
             mask_losses_y = dice_coefficient(
                 input_scores.max(dim=1, keepdim=True)[0],
-                target.max(dim=1, keepdim=True)[0]
+                target.max(dim=1, keepdim=True)[0],
             )
             mask_losses_x = dice_coefficient(
                 input_scores.max(dim=2, keepdim=True)[0],
-                target.max(dim=2, keepdim=True)[0]
+                target.max(dim=2, keepdim=True)[0],
             )
             loss_ins_max.append((mask_losses_y + mask_losses_x).mean())
 
@@ -416,12 +545,15 @@ class SOLOv2(nn.Module):
             loss_ins.append((mask_losses_y + mask_losses_x).mean())
 
             pairwise_losses = compute_pairwise_term(
-                input[:, None, ...], self.pairwise_size,
-                self.pairwise_dilation
+                input[:, None, ...], self.pairwise_size, self.pairwise_dilation
             )
-            weights = (cur_image_color_similarity >= self.pairwise_color_thresh).float() * box_target[:, None, ...].float()
-            #weights = (image_color_similarity >= self.pairwise_color_thresh).float()
-            cur_loss_pairwise = (pairwise_losses * weights).sum() / weights.sum().clamp(min=1.0)
+            weights = (
+                cur_image_color_similarity >= self.pairwise_color_thresh
+            ).float() * box_target[:, None, ...].float()
+            # weights = (image_color_similarity >= self.pairwise_color_thresh).float()
+            cur_loss_pairwise = (pairwise_losses * weights).sum() / weights.sum().clamp(
+                min=1.0
+            )
             warmup_factor = min(self._iter.item() / float(self._warmup_iters), 1.0)
             cur_loss_pairwise = cur_loss_pairwise * warmup_factor
             loss_pairwise.append(cur_loss_pairwise)
@@ -440,13 +572,16 @@ class SOLOv2(nn.Module):
             loss_pairwise = 0 * ins_pred.sum()
         else:
             loss_pairwise = torch.stack(loss_pairwise).mean()
-            loss_pairwise =  1. * loss_pairwise
-
+            loss_pairwise = 1.0 * loss_pairwise
 
         # cate
         cate_labels = [
-            torch.cat([cate_labels_level_img.flatten()
-                       for cate_labels_level_img in cate_labels_level])
+            torch.cat(
+                [
+                    cate_labels_level_img.flatten()
+                    for cate_labels_level_img in cate_labels_level
+                ]
+            )
             for cate_labels_level in zip(*cate_label_list)
         ]
         flatten_cate_labels = torch.cat(cate_labels)
@@ -456,7 +591,9 @@ class SOLOv2(nn.Module):
         ]
         flatten_cate_preds = torch.cat(cate_preds)
         # prepare one_hot
-        pos_inds = torch.nonzero((flatten_cate_labels != self.num_classes) & (flatten_cate_labels != -1)).squeeze(1)
+        pos_inds = torch.nonzero(
+            (flatten_cate_labels != self.num_classes) & (flatten_cate_labels != -1)
+        ).squeeze(1)
         num_ins = len(pos_inds)
 
         flatten_cate_labels_oh = torch.zeros_like(flatten_cate_preds)
@@ -467,16 +604,27 @@ class SOLOv2(nn.Module):
             flatten_cate_preds = flatten_cate_preds[pos_inds]
 
         if len(flatten_cate_preds):
-            loss_cate = self.focal_loss_weight * sigmoid_focal_loss_jit(flatten_cate_preds, flatten_cate_labels_oh,
-                                                                        gamma=self.focal_loss_gamma,
-                                                                        alpha=self.focal_loss_alpha,
-                                                                        reduction="sum") / (num_ins + 1)
+            loss_cate = (
+                self.focal_loss_weight
+                * sigmoid_focal_loss_jit(
+                    flatten_cate_preds,
+                    flatten_cate_labels_oh,
+                    gamma=self.focal_loss_gamma,
+                    alpha=self.focal_loss_alpha,
+                    reduction="sum",
+                )
+                / (num_ins + 1)
+            )
         else:
             loss_cate = 0 * flatten_cate_preds.sum()
 
         emb_labels = [
-            torch.cat([emb_labels_level_img.reshape(-1, self.num_embs)
-                       for emb_labels_level_img in emb_labels_level])
+            torch.cat(
+                [
+                    emb_labels_level_img.reshape(-1, self.num_embs)
+                    for emb_labels_level_img in emb_labels_level
+                ]
+            )
             for emb_labels_level in zip(*emb_label_list)
         ]
         flatten_emb_labels = torch.cat(emb_labels)
@@ -489,28 +637,53 @@ class SOLOv2(nn.Module):
         if num_ins:
             flatten_emb_labels = flatten_emb_labels[pos_inds]
             flatten_emb_preds = flatten_emb_preds[pos_inds]
-            flatten_emb_preds = flatten_emb_preds / flatten_emb_preds.norm(dim=1, keepdim=True)
-            flatten_emb_labels = flatten_emb_labels / flatten_emb_labels.norm(dim=1, keepdim=True)
+            flatten_emb_preds = flatten_emb_preds / flatten_emb_preds.norm(
+                dim=1, keepdim=True
+            )
+            flatten_emb_labels = flatten_emb_labels / flatten_emb_labels.norm(
+                dim=1, keepdim=True
+            )
             loss_emb = 1 - (flatten_emb_preds * flatten_emb_labels).sum(dim=-1)
             loss_emb = loss_emb.mean() * 4.0
         else:
             loss_emb = 0 * flatten_emb_preds.sum()
 
-        return {'loss_ins': loss_ins,
-                'loss_ins_max': loss_ins_max,
-                'loss_pairwise': loss_pairwise,
-                'loss_emb': flatten_emb_preds.sum()*0.,
-                'loss_cate': loss_cate}
+        return {
+            "loss_ins": loss_ins,
+            "loss_ins_max": loss_ins_max,
+            "loss_pairwise": loss_pairwise,
+            "loss_emb": flatten_emb_preds.sum() * 0.0,
+            "loss_cate": loss_cate,
+        }
 
     @staticmethod
     def split_feats(feats):
-        return (F.interpolate(feats[0], scale_factor=0.5, mode='bilinear', align_corners=False, recompute_scale_factor=False),
-                feats[1],
-                feats[2],
-                feats[3],
-                F.interpolate(feats[4], size=feats[3].shape[-2:], mode='bilinear', align_corners=False))
+        return (
+            F.interpolate(
+                feats[0],
+                scale_factor=0.5,
+                mode="bilinear",
+                align_corners=False,
+                recompute_scale_factor=False,
+            ),
+            feats[1],
+            feats[2],
+            feats[3],
+            F.interpolate(
+                feats[4], size=feats[3].shape[-2:], mode="bilinear", align_corners=False
+            ),
+        )
 
-    def inference(self, pred_cates, pred_kernels, pred_embs, pred_masks, cur_sizes, images, keep_train_size=False):
+    def inference(
+        self,
+        pred_cates,
+        pred_kernels,
+        pred_embs,
+        pred_masks,
+        cur_sizes,
+        images,
+        keep_train_size=False,
+    ):
         assert len(pred_cates) == len(pred_kernels)
 
         results = []
@@ -522,12 +695,21 @@ class SOLOv2(nn.Module):
             ori_size = (height, width)
 
             # prediction.
-            pred_cate = [pred_cates[i][img_idx].view(-1, self.num_classes).detach()
-                         for i in range(num_ins_levels)]
-            pred_kernel = [pred_kernels[i][img_idx].permute(1, 2, 0).view(-1, self.num_kernels).detach()
-                           for i in range(num_ins_levels)]
-            pred_emb = [pred_embs[i][img_idx].view(-1, self.num_embs).detach()
-                         for i in range(num_ins_levels)]
+            pred_cate = [
+                pred_cates[i][img_idx].view(-1, self.num_classes).detach()
+                for i in range(num_ins_levels)
+            ]
+            pred_kernel = [
+                pred_kernels[i][img_idx]
+                .permute(1, 2, 0)
+                .view(-1, self.num_kernels)
+                .detach()
+                for i in range(num_ins_levels)
+            ]
+            pred_emb = [
+                pred_embs[i][img_idx].view(-1, self.num_embs).detach()
+                for i in range(num_ins_levels)
+            ]
             pred_mask = pred_masks[img_idx, ...].unsqueeze(0)
 
             pred_cate = torch.cat(pred_cate, dim=0)
@@ -535,13 +717,27 @@ class SOLOv2(nn.Module):
             pred_emb = torch.cat(pred_emb, dim=0)
 
             # inference for single image.
-            result = self.inference_single_image(pred_cate, pred_kernel, pred_emb, pred_mask,
-                                                 cur_sizes[img_idx], ori_size, keep_train_size)
+            result = self.inference_single_image(
+                pred_cate,
+                pred_kernel,
+                pred_emb,
+                pred_mask,
+                cur_sizes[img_idx],
+                ori_size,
+                keep_train_size,
+            )
             results.append({"instances": result})
         return results
 
     def inference_single_image(
-            self, cate_preds, kernel_preds, emb_preds, seg_preds, cur_size, ori_size, keep_train_size=False
+        self,
+        cate_preds,
+        kernel_preds,
+        emb_preds,
+        seg_preds,
+        cur_size,
+        ori_size,
+        keep_train_size=False,
     ):
         # overall info.
         h, w = cur_size
@@ -550,7 +746,7 @@ class SOLOv2(nn.Module):
         upsampled_size_out = (int(f_h * ratio), int(f_w * ratio))
 
         # process.
-        inds = (cate_preds > self.score_threshold)
+        inds = cate_preds > self.score_threshold
         cate_scores = cate_preds[inds]
         if len(cate_scores) == 0:
             results = Instances(ori_size)
@@ -568,11 +764,11 @@ class SOLOv2(nn.Module):
         cate_labels = inds[:, 1]
         kernel_preds = kernel_preds[inds[:, 0]]
         emb_preds = emb_preds[inds[:, 0]]
-        
-        if keep_train_size: # used in self-training
+
+        if keep_train_size:  # used in self-training
             # sort and keep top nms_pre
             sort_inds = torch.argsort(cate_scores, descending=True)
-            max_pseudo_labels =self.max_before_nms
+            max_pseudo_labels = self.max_before_nms
             if len(sort_inds) > max_pseudo_labels:
                 sort_inds = sort_inds[:max_pseudo_labels]
             cate_scores = cate_scores[sort_inds]
@@ -586,9 +782,11 @@ class SOLOv2(nn.Module):
         strides = kernel_preds.new_ones(size_trans[-1])
 
         n_stage = len(self.num_grids)
-        strides[:size_trans[0]] *= self.instance_strides[0]
+        strides[: size_trans[0]] *= self.instance_strides[0]
         for ind_ in range(1, n_stage):
-            strides[size_trans[ind_ - 1]:size_trans[ind_]] *= self.instance_strides[ind_]
+            strides[size_trans[ind_ - 1] : size_trans[ind_]] *= self.instance_strides[
+                ind_
+            ]
         strides = strides[inds[:, 0]]
 
         # mask encoding.
@@ -623,13 +821,13 @@ class SOLOv2(nn.Module):
         # maskness.
         seg_masks = seg_preds > self.mask_threshold
         maskness = (seg_preds * seg_masks.float()).sum((1, 2)) / seg_masks.sum((1, 2))
-        
+
         scores = cate_scores * maskness
 
         # sort and keep top nms_pre
         sort_inds = torch.argsort(scores, descending=True)
         if len(sort_inds) > self.max_before_nms:
-            sort_inds = sort_inds[:self.max_before_nms]
+            sort_inds = sort_inds[: self.max_before_nms]
         seg_masks = seg_masks[sort_inds, :, :]
         seg_preds = seg_preds[sort_inds, :, :]
         sum_masks = sum_masks[sort_inds]
@@ -641,13 +839,20 @@ class SOLOv2(nn.Module):
 
         if self.nms_type == "matrix":
             # matrix nms & filter.
-            scores = matrix_nms(cate_labels, seg_masks, sum_masks, scores,
-                                     sigma=self.nms_sigma, kernel=self.nms_kernel)
+            scores = matrix_nms(
+                cate_labels,
+                seg_masks,
+                sum_masks,
+                scores,
+                sigma=self.nms_sigma,
+                kernel=self.nms_kernel,
+            )
             keep = scores >= self.update_threshold
         elif self.nms_type == "mask":
             # original mask nms.
-            keep = mask_nms(cate_labels, seg_masks, sum_masks, scores,
-                            nms_thr=self.mask_threshold)
+            keep = mask_nms(
+                cate_labels, seg_masks, sum_masks, scores, nms_thr=self.mask_threshold
+            )
         else:
             raise NotImplementedError
 
@@ -672,7 +877,7 @@ class SOLOv2(nn.Module):
         # sort and keep top_k
         sort_inds = torch.argsort(scores, descending=True)
         if len(sort_inds) > self.max_per_img:
-            sort_inds = sort_inds[:self.max_per_img]
+            sort_inds = sort_inds[: self.max_per_img]
         seg_preds = seg_preds[sort_inds, :, :]
         scores = scores[sort_inds]
         cate_scores = cate_scores[sort_inds]
@@ -681,15 +886,18 @@ class SOLOv2(nn.Module):
         emb_preds = emb_preds[sort_inds]
 
         # reshape to original size.
-        seg_preds = F.interpolate(seg_preds.unsqueeze(0),
-                                  size=upsampled_size_out,
-                                  mode='bilinear', align_corners=False)[:, :, :h, :w]
-        if keep_train_size: # for self-training
+        seg_preds = F.interpolate(
+            seg_preds.unsqueeze(0),
+            size=upsampled_size_out,
+            mode="bilinear",
+            align_corners=False,
+        )[:, :, :h, :w]
+        if keep_train_size:  # for self-training
             seg_masks = seg_preds.squeeze(0)
         else:
-            seg_masks = F.interpolate(seg_preds,
-                                      size=ori_size,
-                                      mode='bilinear', align_corners=False).squeeze(0)
+            seg_masks = F.interpolate(
+                seg_preds, size=ori_size, mode="bilinear", align_corners=False
+            ).squeeze(0)
         seg_masks = seg_masks > self.mask_threshold
 
         sum_masks = seg_masks.sum((1, 2)).float()
@@ -712,8 +920,8 @@ class SOLOv2(nn.Module):
         results.pred_embs = emb_preds / emb_preds.norm(dim=-1, keepdim=True)
 
         # get bbox from mask
-        #pred_boxes = torch.zeros(seg_masks.size(0), 4)
-        #for i in range(seg_masks.size(0)):
+        # pred_boxes = torch.zeros(seg_masks.size(0), 4)
+        # for i in range(seg_masks.size(0)):
         #    mask = seg_masks[i].squeeze()
         #    ys, xs = torch.where(mask)
         #    pred_boxes[i] = torch.tensor([xs.min(), ys.min(), xs.max(), ys.max()]).float()
@@ -723,7 +931,15 @@ class SOLOv2(nn.Module):
         width, height = width_proj.sum(1), height_proj.sum(1)
         center_ws, _ = center_of_mass(width_proj[:, None, :])
         _, center_hs = center_of_mass(height_proj[:, :, None])
-        pred_boxes = torch.stack([center_ws-0.5*width, center_hs-0.5*height, center_ws+0.5*width, center_hs+0.5*height], 1)
+        pred_boxes = torch.stack(
+            [
+                center_ws - 0.5 * width,
+                center_hs - 0.5 * height,
+                center_ws + 0.5 * width,
+                center_hs + 0.5 * height,
+            ],
+            1,
+        )
         results.pred_boxes = Boxes(pred_boxes)
 
         return results
@@ -751,21 +967,28 @@ class SOLOv2InsHead(nn.Module):
             print("Strides should match the features.")
         # fmt: on
 
-        head_configs = {"cate": (cfg.MODEL.SOLOV2.NUM_INSTANCE_CONVS,
-                                 cfg.MODEL.SOLOV2.USE_DCN_IN_INSTANCE,
-                                 False),
-                        "kernel": (cfg.MODEL.SOLOV2.NUM_INSTANCE_CONVS,
-                                   cfg.MODEL.SOLOV2.USE_DCN_IN_INSTANCE,
-                                   cfg.MODEL.SOLOV2.USE_COORD_CONV)
-                        }
+        head_configs = {
+            "cate": (
+                cfg.MODEL.SOLOV2.NUM_INSTANCE_CONVS,
+                cfg.MODEL.SOLOV2.USE_DCN_IN_INSTANCE,
+                False,
+            ),
+            "kernel": (
+                cfg.MODEL.SOLOV2.NUM_INSTANCE_CONVS,
+                cfg.MODEL.SOLOV2.USE_DCN_IN_INSTANCE,
+                cfg.MODEL.SOLOV2.USE_COORD_CONV,
+            ),
+        }
 
         norm = None if cfg.MODEL.SOLOV2.NORM == "none" else cfg.MODEL.SOLOV2.NORM
         in_channels = [s.channels for s in input_shape]
-        assert len(set(in_channels)) == 1, \
-            print("Each level must have the same channel!")
+        assert len(set(in_channels)) == 1, print(
+            "Each level must have the same channel!"
+        )
         in_channels = in_channels[0]
-        assert in_channels == cfg.MODEL.SOLOV2.INSTANCE_IN_CHANNELS, \
-            print("In channels should equal to tower in channels!")
+        assert in_channels == cfg.MODEL.SOLOV2.INSTANCE_IN_CHANNELS, print(
+            "In channels should equal to tower in channels!"
+        )
 
         for head in head_configs:
             tower = []
@@ -780,40 +1003,44 @@ class SOLOv2InsHead(nn.Module):
                 else:
                     chn = self.instance_channels
 
-                tower.append(conv_func(
-                    chn, self.instance_channels,
-                    kernel_size=3, stride=1,
-                    padding=1, bias=norm is None
-                ))
+                tower.append(
+                    conv_func(
+                        chn,
+                        self.instance_channels,
+                        kernel_size=3,
+                        stride=1,
+                        padding=1,
+                        bias=norm is None,
+                    )
+                )
                 if norm == "GN":
                     tower.append(nn.GroupNorm(32, self.instance_channels))
                 tower.append(nn.ReLU(inplace=True))
-            self.add_module('{}_tower'.format(head),
-                            nn.Sequential(*tower))
+            self.add_module("{}_tower".format(head), nn.Sequential(*tower))
 
         self.cate_pred = nn.Conv2d(
-            self.instance_channels, self.num_classes,
-            kernel_size=3, stride=1, padding=1
+            self.instance_channels, self.num_classes, kernel_size=3, stride=1, padding=1
         )
         self.kernel_pred = nn.Conv2d(
-            self.instance_channels, self.num_kernels,
-            kernel_size=3, stride=1, padding=1
+            self.instance_channels, self.num_kernels, kernel_size=3, stride=1, padding=1
         )
         self.emb_pred = nn.Conv2d(
-            self.instance_channels, self.num_embs,
-            kernel_size=3, stride=1, padding=1
+            self.instance_channels, self.num_embs, kernel_size=3, stride=1, padding=1
         )
 
         if cfg.MODEL.SOLOV2.FREEZE:
-            #for modules in [self.cate_tower, self.kernel_tower, self.kernel_pred]:
+            # for modules in [self.cate_tower, self.kernel_tower, self.kernel_pred]:
             for modules in [self.cate_tower, self.kernel_tower]:
                 for p in modules.parameters():
                     p.requires_grad = False
             print("froze ins head parameters")
 
         for modules in [
-            self.cate_tower, self.kernel_tower,
-            self.cate_pred, self.kernel_pred, self.emb_pred
+            self.cate_tower,
+            self.kernel_tower,
+            self.cate_pred,
+            self.kernel_pred,
+            self.emb_pred,
         ]:
             for l in modules.modules():
                 if isinstance(l, nn.Conv2d):
@@ -841,8 +1068,12 @@ class SOLOv2InsHead(nn.Module):
         for idx, feature in enumerate(features):
             ins_kernel_feat = feature
             # concat coord
-            x_range = torch.linspace(-1, 1, ins_kernel_feat.shape[-1], device=ins_kernel_feat.device)
-            y_range = torch.linspace(-1, 1, ins_kernel_feat.shape[-2], device=ins_kernel_feat.device)
+            x_range = torch.linspace(
+                -1, 1, ins_kernel_feat.shape[-1], device=ins_kernel_feat.device
+            )
+            y_range = torch.linspace(
+                -1, 1, ins_kernel_feat.shape[-2], device=ins_kernel_feat.device
+            )
             y, x = torch.meshgrid(y_range, x_range, indexing="ij")
             y = y.expand([ins_kernel_feat.shape[0], 1, -1, -1])
             x = x.expand([ins_kernel_feat.shape[0], 1, -1, -1])
@@ -852,7 +1083,9 @@ class SOLOv2InsHead(nn.Module):
             # individual feature.
             kernel_feat = ins_kernel_feat
             seg_num_grid = self.num_grids[idx]
-            kernel_feat = F.interpolate(kernel_feat, size=seg_num_grid, mode='bilinear', align_corners=False)
+            kernel_feat = F.interpolate(
+                kernel_feat, size=seg_num_grid, mode="bilinear", align_corners=False
+            )
             cate_feat = kernel_feat[:, :-2, :, :]
 
             # kernel
@@ -891,15 +1124,20 @@ class SOLOv2MaskHead(nn.Module):
             convs_per_level = nn.Sequential()
             if i == 0:
                 conv_tower = list()
-                conv_tower.append(nn.Conv2d(
-                    self.mask_in_channels, self.mask_channels,
-                    kernel_size=3, stride=1,
-                    padding=1, bias=norm is None
-                ))
+                conv_tower.append(
+                    nn.Conv2d(
+                        self.mask_in_channels,
+                        self.mask_channels,
+                        kernel_size=3,
+                        stride=1,
+                        padding=1,
+                        bias=norm is None,
+                    )
+                )
                 if norm == "GN":
                     conv_tower.append(nn.GroupNorm(32, self.mask_channels))
                 conv_tower.append(nn.ReLU(inplace=False))
-                convs_per_level.add_module('conv' + str(i), nn.Sequential(*conv_tower))
+                convs_per_level.add_module("conv" + str(i), nn.Sequential(*conv_tower))
                 self.convs_all_levels.append(convs_per_level)
                 continue
 
@@ -907,43 +1145,60 @@ class SOLOv2MaskHead(nn.Module):
                 if j == 0:
                     chn = self.mask_in_channels + 2 if i == 3 else self.mask_in_channels
                     conv_tower = list()
-                    conv_tower.append(nn.Conv2d(
-                        chn, self.mask_channels,
-                        kernel_size=3, stride=1,
-                        padding=1, bias=norm is None
-                    ))
+                    conv_tower.append(
+                        nn.Conv2d(
+                            chn,
+                            self.mask_channels,
+                            kernel_size=3,
+                            stride=1,
+                            padding=1,
+                            bias=norm is None,
+                        )
+                    )
                     if norm == "GN":
                         conv_tower.append(nn.GroupNorm(32, self.mask_channels))
                     conv_tower.append(nn.ReLU(inplace=False))
-                    convs_per_level.add_module('conv' + str(j), nn.Sequential(*conv_tower))
-                    upsample_tower = nn.Upsample(
-                        scale_factor=2, mode='bilinear', align_corners=False)
                     convs_per_level.add_module(
-                        'upsample' + str(j), upsample_tower)
+                        "conv" + str(j), nn.Sequential(*conv_tower)
+                    )
+                    upsample_tower = nn.Upsample(
+                        scale_factor=2, mode="bilinear", align_corners=False
+                    )
+                    convs_per_level.add_module("upsample" + str(j), upsample_tower)
                     continue
                 conv_tower = list()
-                conv_tower.append(nn.Conv2d(
-                    self.mask_channels, self.mask_channels,
-                    kernel_size=3, stride=1,
-                    padding=1, bias=norm is None
-                ))
+                conv_tower.append(
+                    nn.Conv2d(
+                        self.mask_channels,
+                        self.mask_channels,
+                        kernel_size=3,
+                        stride=1,
+                        padding=1,
+                        bias=norm is None,
+                    )
+                )
                 if norm == "GN":
                     conv_tower.append(nn.GroupNorm(32, self.mask_channels))
                 conv_tower.append(nn.ReLU(inplace=False))
-                convs_per_level.add_module('conv' + str(j), nn.Sequential(*conv_tower))
+                convs_per_level.add_module("conv" + str(j), nn.Sequential(*conv_tower))
                 upsample_tower = nn.Upsample(
-                    scale_factor=2, mode='bilinear', align_corners=False)
-                convs_per_level.add_module('upsample' + str(j), upsample_tower)
+                    scale_factor=2, mode="bilinear", align_corners=False
+                )
+                convs_per_level.add_module("upsample" + str(j), upsample_tower)
 
             self.convs_all_levels.append(convs_per_level)
 
         self.conv_pred = nn.Sequential(
             nn.Conv2d(
-                self.mask_channels, self.num_masks,
-                kernel_size=1, stride=1,
-                padding=0, bias=norm is None),
+                self.mask_channels,
+                self.num_masks,
+                kernel_size=1,
+                stride=1,
+                padding=0,
+                bias=norm is None,
+            ),
             nn.GroupNorm(32, self.num_masks),
-            nn.ReLU(inplace=True)
+            nn.ReLU(inplace=True),
         )
 
         for modules in [self.convs_all_levels, self.conv_pred]:
@@ -961,23 +1216,30 @@ class SOLOv2MaskHead(nn.Module):
         Returns:
             pass
         """
-        assert len(features) == self.num_levels, \
-            print("The number of input features should be equal to the supposed level.")
+        assert len(features) == self.num_levels, print(
+            "The number of input features should be equal to the supposed level."
+        )
 
         # bottom features first.
         feature_add_all_level = self.convs_all_levels[0](features[0])
         for i in range(1, self.num_levels):
             mask_feat = features[i]
             if i == 3:  # add for coord.
-                x_range = torch.linspace(-1, 1, mask_feat.shape[-1], device=mask_feat.device)
-                y_range = torch.linspace(-1, 1, mask_feat.shape[-2], device=mask_feat.device)
+                x_range = torch.linspace(
+                    -1, 1, mask_feat.shape[-1], device=mask_feat.device
+                )
+                y_range = torch.linspace(
+                    -1, 1, mask_feat.shape[-2], device=mask_feat.device
+                )
                 y, x = torch.meshgrid(y_range, x_range, indexing="ij")
                 y = y.expand([mask_feat.shape[0], 1, -1, -1])
                 x = x.expand([mask_feat.shape[0], 1, -1, -1])
                 coord_feat = torch.cat([x, y], 1)
                 mask_feat = torch.cat([mask_feat, coord_feat], 1)
             # add for top features.
-            feature_add_all_level = self.convs_all_levels[i](mask_feat) + feature_add_all_level
+            feature_add_all_level = (
+                self.convs_all_levels[i](mask_feat) + feature_add_all_level
+            )
 
         mask_pred = self.conv_pred(feature_add_all_level)
         return mask_pred

@@ -22,8 +22,11 @@
 # SOFTWARE.
 # -------------------------------------------------------------------------
 
-import logging
-from detectron2.data.common import MapDataset, AspectRatioGroupedDataset
+# import logging
+from detectron2.data.common import (
+    # MapDataset,
+    AspectRatioGroupedDataset,
+)
 
 
 class AspectRatioGroupedDatasetTwoCrop(AspectRatioGroupedDataset):

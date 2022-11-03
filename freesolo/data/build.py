@@ -31,9 +31,11 @@
 # -------------------------------------------------------------------------
 
 import logging
-import numpy as np
+
+# import numpy as np
 import operator
-import json
+
+# import json
 import torch.utils.data
 from detectron2.utils.comm import get_world_size
 from detectron2.data.common import (
@@ -41,15 +43,15 @@ from detectron2.data.common import (
     MapDataset,
 )
 from detectron2.data.samplers import (
-    InferenceSampler,
-    RepeatFactorTrainingSampler,
+    # InferenceSampler,
+    # RepeatFactorTrainingSampler,
     TrainingSampler,
 )
 from detectron2.data.build import (
-    trivial_batch_collator,
+    # trivial_batch_collator,
     worker_init_reset_seed,
     get_detection_dataset_dicts,
-    build_batch_data_loader,
+    # build_batch_data_loader,
 )
 from freesolo.data.dataset_mapper import DatasetMapper
 from freesolo.data.common import AspectRatioGroupedDatasetTwoCrop

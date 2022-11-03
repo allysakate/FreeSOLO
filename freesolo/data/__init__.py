@@ -23,3 +23,5 @@
 # -------------------------------------------------------------------------
 
 from .datasets import builtin  # ensure the builtin datasets are registered
+
+__all__ = ["builtin"]

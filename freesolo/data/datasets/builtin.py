@@ -26,7 +26,7 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-# 
+#
 # Modified by Xinlong Wang
 # -------------------------------------------------------------------------
 
@@ -111,7 +111,7 @@ def load_coco_unlabel_json(
             "Loading {} takes {:.2f} seconds.".format(json_file, timer.seconds())
         )
 
-    id_map = None
+    # id_map = None
     # sort indices for reproducible results
     img_ids = sorted(coco_api.imgs.keys())
 
@@ -126,7 +126,7 @@ def load_coco_unlabel_json(
         record["file_name"] = os.path.join(image_root, img_dict["file_name"])
         record["height"] = img_dict["height"]
         record["width"] = img_dict["width"]
-        image_id = record["image_id"] = img_dict["id"]
+        # image_id = record["image_id"] = img_dict["id"]
 
         dataset_dicts.append(record)
 
@@ -136,42 +136,66 @@ def load_coco_unlabel_json(
 _root = os.getenv("DETECTRON2_DATASETS", "datasets")
 register_coco_unlabel(_root)
 # register labeled:
-register_coco_instances("coco_2017_train_sup10_seed1_labeled", 
-                        {}, 
-                        os.path.join(_root, "coco/annotations/instances_train2017_sup10_seed1_labeled.json"), 
-                        os.path.join(_root, "coco/train2017"))
-register_coco_instances("voc_2007_trainval_json",
-                        {},
-                        os.path.join(_root, "VOC2007/voc_2007_trainval.json"),
-                        os.path.join(_root, "VOC2007/JPEGImages/")) 
-register_coco_instances("uvo_val",
-                        {},
-                        os.path.join(_root, "UVO/FrameSet/UVO_frame_val.json"),
-                        os.path.join(_root, "UVO/uvo_videos_sparse_frames/")) 
-register_coco_instances("coco_2017_train_unlabeled_densecl_r101", 
-                        {}, 
-                        os.path.join(_root, "coco/annotations/instances_train2017_unlabeled2017_densecl_r101.json"), 
-                        os.path.join(_root, "coco/"))
-register_coco_instances("coco_2017_train_unlabeled_freesolo_pl", 
-                        {}, 
-                        os.path.join(_root, "coco/annotations/instances_train2017_unlabeled2017_freesolo_pl.json"), 
-                        os.path.join(_root, "coco/"))
+register_coco_instances(
+    "coco_2017_train_sup10_seed1_labeled",
+    {},
+    os.path.join(
+        _root, "coco/annotations/instances_train2017_sup10_seed1_labeled.json"
+    ),
+    os.path.join(_root, "coco/train2017"),
+)
+register_coco_instances(
+    "voc_2007_trainval_json",
+    {},
+    os.path.join(_root, "VOC2007/voc_2007_trainval.json"),
+    os.path.join(_root, "VOC2007/JPEGImages/"),
+)
+register_coco_instances(
+    "uvo_val",
+    {},
+    os.path.join(_root, "UVO/FrameSet/UVO_frame_val.json"),
+    os.path.join(_root, "UVO/uvo_videos_sparse_frames/"),
+)
+register_coco_instances(
+    "coco_2017_train_unlabeled_densecl_r101",
+    {},
+    os.path.join(
+        _root, "coco/annotations/instances_train2017_unlabeled2017_densecl_r101.json"
+    ),
+    os.path.join(_root, "coco/"),
+)
+register_coco_instances(
+    "coco_2017_train_unlabeled_freesolo_pl",
+    {},
+    os.path.join(
+        _root, "coco/annotations/instances_train2017_unlabeled2017_freesolo_pl.json"
+    ),
+    os.path.join(_root, "coco/"),
+)
 
-register_coco_instances("mots_train",
-                        {},
-                        os.path.join(_root, "mots/annotations/mots_train.json"), 
-                        os.path.join(_root, "mots/"))
-register_coco_instances("mots_val",
-                        {},
-                        os.path.join(_root, "mots/annotations/mots_val.json"), 
-                        os.path.join(_root, "mots/"))
+register_coco_instances(
+    "mots_train",
+    {},
+    os.path.join(_root, "mots/annotations/mots_train.json"),
+    os.path.join(_root, "mots/"),
+)
+register_coco_instances(
+    "mots_val",
+    {},
+    os.path.join(_root, "mots/annotations/mots_val.json"),
+    os.path.join(_root, "mots/"),
+)
 
-register_coco_instances("coco_train",
-                        {},
-                        os.path.join(_root, "coco/annotations/selected_instances_train2017.json"), 
-                        os.path.join(_root, "coco/train2017/"))
+register_coco_instances(
+    "coco_train",
+    {},
+    os.path.join(_root, "coco/annotations/selected_instances_train2017.json"),
+    os.path.join(_root, "coco/train2017/"),
+)
 
-register_coco_instances("coco_val",
-                        {},
-                        os.path.join(_root, "coco/annotations/selected_instances_val2017.json"), 
-                        os.path.join(_root, "coco/val2017/"))
+register_coco_instances(
+    "coco_val",
+    {},
+    os.path.join(_root, "coco/annotations/selected_instances_val2017.json"),
+    os.path.join(_root, "coco/val2017/"),
+)

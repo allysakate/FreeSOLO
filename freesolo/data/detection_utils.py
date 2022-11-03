@@ -44,7 +44,7 @@ from detectron2.structures import (
     Instances,
     Keypoints,
     PolygonMasks,
-    RotatedBoxes,
+    # RotatedBoxes,
     polygons_to_bitmask,
 )
 
@@ -109,7 +109,10 @@ def annotations_to_instances(annos, image_size, mask_format="polygon"):
     """
     boxes = (
         np.stack(
-            [BoxMode.convert(obj["bbox"], obj["bbox_mode"], BoxMode.XYXY_ABS) for obj in annos]
+            [
+                BoxMode.convert(obj["bbox"], obj["bbox_mode"], BoxMode.XYXY_ABS)
+                for obj in annos
+            ]
         )
         if len(annos)
         else np.zeros((0, 4))
@@ -151,9 +154,9 @@ def annotations_to_instances(annos, image_size, mask_format="polygon"):
                     # COCO RLE
                     masks.append(mask_util.decode(segm))
                 elif isinstance(segm, np.ndarray):
-                    assert segm.ndim == 2, "Expect segmentation of 2 dimensions, got {}.".format(
-                        segm.ndim
-                    )
+                    assert (
+                        segm.ndim == 2
+                    ), "Expect segmentation of 2 dimensions, got {}.".format(segm.ndim)
                     # mask array
                     masks.append(segm)
                 else:
@@ -174,4 +177,3 @@ def annotations_to_instances(annos, image_size, mask_format="polygon"):
         target.gt_keypoints = Keypoints(kpts)
 
     return target
-

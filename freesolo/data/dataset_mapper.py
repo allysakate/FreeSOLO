@@ -34,10 +34,11 @@ import copy
 import logging
 import numpy as np
 from PIL import Image
-from typing import List, Optional, Union
+
+# from typing import List, Optional, Union
 import torch
 
-from detectron2.config import configurable
+# from detectron2.config import configurable
 import detectron2.data.detection_utils as utils
 import detectron2.data.transforms as T
 from detectron2.data.dataset_mapper import DatasetMapper

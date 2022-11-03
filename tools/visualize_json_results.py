@@ -37,27 +37,28 @@ from detectron2.utils.file_io import PathManager
 from detectron2.utils.logger import setup_logger
 from detectron2.utils.visualizer import Visualizer
 
-import sys 
-sys.path.append("..") 
+import sys
+
+sys.path.append("..")
 
 
 def create_instances(predictions, image_size):
     ret = Instances(image_size)
 
     score = np.asarray([x["score"] for x in predictions])
-    #maskness = np.asarray([x["maskness"] for x in predictions])
-    #chosen = ((score < args.conf_threshold) & (score > 0.05)).nonzero()[0]
+    # maskness = np.asarray([x["maskness"] for x in predictions])
+    # chosen = ((score < args.conf_threshold) & (score > 0.05)).nonzero()[0]
     chosen = (score > args.conf_threshold).nonzero()[0]
-    #chosen = ((score < args.conf_threshold) & (score > 0.1) & (maskness > 0.7)).nonzero()[0]
+    # chosen = ((score < args.conf_threshold) & (score > 0.1) & (maskness > 0.7)).nonzero()[0]
     score = score[chosen]
     bbox = np.asarray([predictions[i]["bbox"] for i in chosen]).reshape(-1, 4)
     bbox = BoxMode.convert(bbox, BoxMode.XYWH_ABS, BoxMode.XYXY_ABS)
 
-    labels = np.asarray([dataset_id_map(predictions[i]["category_id"]) for i in chosen])
+    # labels = np.asarray([dataset_id_map(predictions[i]["category_id"]) for i in chosen])
 
-    #ret.scores = score
+    # ret.scores = score
     ret.pred_boxes = Boxes(bbox)
-    #ret.pred_classes = labels
+    # ret.pred_classes = labels
 
     try:
         ret.pred_masks = [predictions[i]["segmentation"] for i in chosen]
@@ -70,10 +71,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="A script that visualizes the json predictions from COCO or LVIS dataset."
     )
-    parser.add_argument("--input", required=True, help="JSON file produced by the model")
+    parser.add_argument(
+        "--input", required=True, help="JSON file produced by the model"
+    )
     parser.add_argument("--output", required=True, help="output directory")
-    parser.add_argument("--dataset", help="name of the dataset", default="coco_2017_val")
-    parser.add_argument("--conf-threshold", default=0.5, type=float, help="confidence threshold")
+    parser.add_argument(
+        "--dataset", help="name of the dataset", default="coco_2017_val"
+    )
+    parser.add_argument(
+        "--conf-threshold", default=0.5, type=float, help="confidence threshold"
+    )
     args = parser.parse_args()
 
     logger = setup_logger()
@@ -85,7 +92,7 @@ if __name__ == "__main__":
     for p in predictions:
         pred_by_image[p["image_id"]].append(p)
 
-    #register_all_coco(_root)
+    # register_all_coco(_root)
     dicts = list(DatasetCatalog.get(args.dataset))
     metadata = MetadataCatalog.get(args.dataset)
     if hasattr(metadata, "thing_dataset_id_to_contiguous_id"):

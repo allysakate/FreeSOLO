@@ -22,7 +22,7 @@
 # SOFTWARE.
 #
 # -------------------------------------------------------------------------
-
+import sys
 import argparse
 import glob
 import multiprocessing as mp
@@ -36,10 +36,10 @@ from detectron2.data.detection_utils import read_image
 from detectron2.utils.logger import setup_logger
 
 from predictor import VisualizationDemo
-
-import sys
-sys.path.append('..')
 from freesolo import add_solo_config
+
+
+sys.path.append("..")
 
 # constants
 WINDOW_NAME = "COCO detections"
@@ -57,7 +57,9 @@ def setup_cfg(args):
     # Set score_threshold for builtin models
     cfg.MODEL.RETINANET.SCORE_THRESH_TEST = args.confidence_threshold
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = args.confidence_threshold
-    cfg.MODEL.PANOPTIC_FPN.COMBINE.INSTANCES_CONFIDENCE_THRESH = args.confidence_threshold
+    cfg.MODEL.PANOPTIC_FPN.COMBINE.INSTANCES_CONFIDENCE_THRESH = (
+        args.confidence_threshold
+    )
     cfg.freeze()
     return cfg
 
@@ -70,7 +72,9 @@ def get_parser():
         metavar="FILE",
         help="path to config file",
     )
-    parser.add_argument("--webcam", action="store_true", help="Take inputs from webcam.")
+    parser.add_argument(
+        "--webcam", action="store_true", help="Take inputs from webcam."
+    )
     parser.add_argument("--video-input", help="Path to video file.")
     parser.add_argument(
         "--input",
@@ -134,7 +138,9 @@ if __name__ == "__main__":
                     assert os.path.isdir(args.output), args.output
                     out_filename = os.path.join(args.output, os.path.basename(path))
                 else:
-                    assert len(args.input) == 1, "Please specify a directory with args.output"
+                    assert (
+                        len(args.input) == 1
+                    ), "Please specify a directory with args.output"
                     out_filename = args.output
                 visualized_output.save(out_filename)
             else:

@@ -30,7 +30,7 @@
 # Modified by Xinlong Wang
 # -------------------------------------------------------------------------
 
-import detectron2.utils.comm as comm
+# import detectron2.utils.comm as comm
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.config import get_cfg
 from detectron2.engine import default_argument_parser, default_setup, launch
@@ -39,11 +39,13 @@ from freesolo import add_solo_config
 from freesolo.engine.trainer import BaselineTrainer
 
 # hacky way to register
-import freesolo.data.datasets.builtin
-from freesolo.modeling.solov2 import PseudoSOLOv2
+import freesolo.data.datasets.builtin  # noqa: F401
+from freesolo.modeling.solov2 import PseudoSOLOv2  # noqa: F401
 
 import warnings
+
 warnings.simplefilter("ignore", UserWarning)
+
 
 def setup(args):
     """

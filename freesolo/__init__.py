@@ -5,3 +5,5 @@
 # https://github.com/NVlabs/FreeSOLO/blob/main/LICENSE
 
 from .config import add_solo_config
+
+__all__ = ["add_solo_config"]

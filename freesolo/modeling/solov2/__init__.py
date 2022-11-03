@@ -6,3 +6,5 @@
 
 from .solov2 import SOLOv2
 from .pseudo_solov2 import PseudoSOLOv2
+
+__all__ = ["SOLOv2", "PseudoSOLOv2"]

@@ -23,9 +23,10 @@ from detectron2.utils.logger import setup_logger
 from predictor import VisualizationDemo
 
 import sys
-sys.path.append('.')
 from freesolo import add_solo_config
 from freesolo.modeling.solov2.utils import matrix_nms, center_of_mass
+
+sys.path.append(".")
 
 # constants
 WINDOW_NAME = "COCO detections"
@@ -53,11 +54,13 @@ def get_parser():
         metavar="FILE",
         help="path to config file",
     )
-    parser.add_argument("--webcam", action="store_true", help="Take inputs from webcam.")
+    parser.add_argument(
+        "--webcam", action="store_true", help="Take inputs from webcam."
+    )
     parser.add_argument("--video-input", help="Path to video file.")
     parser.add_argument(
         "--input",
-        #nargs="+",
+        # nargs="+",
         help="A list of space separated input images; "
         "or a single glob pattern such as 'directory/*.jpg'",
     )
@@ -93,26 +96,25 @@ if __name__ == "__main__":
 
     demo = VisualizationDemo(cfg)
 
-
     ann_dict = dict()
-    ann_dict_ = json.load(open('datasets/coco/annotations/instances_train2017.json'))
-    ann_dict['categories'] = ann_dict_['categories']
+    ann_dict_ = json.load(open("datasets/coco/annotations/instances_train2017.json"))
+    ann_dict["categories"] = ann_dict_["categories"]
 
     images_list = []
     anns_list = []
     ann_id = 0
 
-    paths = glob.glob(args.input + '/*g')
+    paths = glob.glob(args.input + "/*g")
     split = args.split
     if split == -1:
         save_path = args.output
         cur_paths = paths
     else:
-        num_each_split = 15000                                          
-        image_range = [split*num_each_split, (split+1) * num_each_split]
+        num_each_split = 15000
+        image_range = [split * num_each_split, (split + 1) * num_each_split]
         save_path = args.output + str(split)
-        assert image_range[0] < len(paths)                   
-        cur_paths = paths[image_range[0]:min(len(paths), image_range[1])]
+        assert image_range[0] < len(paths)
+        cur_paths = paths[image_range[0] : min(len(paths), image_range[1])]
     for path in tqdm.tqdm(cur_paths, disable=not args.output):
         # use PIL, to be consistent with evaluation
         try:
@@ -124,11 +126,17 @@ if __name__ == "__main__":
         start_time = time.time()
         predictions, visualized_output = demo.run_on_image(img)
 
-        keys = predictions['res5'][0]
+        keys = predictions["res5"][0]
         scale_factors = [1.0, 0.5, 0.25]
         queries_list = []
         for scale_factor in scale_factors:
-            cur_queries = F.interpolate(keys[None, ...], scale_factor=scale_factor, mode='bilinear')[0].reshape(keys.shape[0], -1).permute(1, 0)
+            cur_queries = (
+                F.interpolate(
+                    keys[None, ...], scale_factor=scale_factor, mode="bilinear"
+                )[0]
+                .reshape(keys.shape[0], -1)
+                .permute(1, 0)
+            )
             num_q = len(cur_queries)
             queries_list.append(cur_queries)
         queries = torch.cat(queries_list)
@@ -146,9 +154,9 @@ if __name__ == "__main__":
         masks = soft_masks >= 0.5
 
         # downsample queries
-        queries = F.interpolate(queries[None, ...], size=128, mode='linear')[0]
+        queries = F.interpolate(queries[None, ...], size=128, mode="linear")[0]
 
-        sum_masks = masks.sum((1,2))
+        sum_masks = masks.sum((1, 2))
         keep = sum_masks > 1
         if keep.sum() == 0:
             continue
@@ -165,7 +173,9 @@ if __name__ == "__main__":
         sum_masks = sum_masks[sort_inds]
         soft_masks = soft_masks[sort_inds]
         queries = queries[sort_inds]
-        maskness = matrix_nms(maskness*0, masks, sum_masks, maskness, sigma=2, kernel='gaussian')
+        maskness = matrix_nms(
+            maskness * 0, masks, sum_masks, maskness, sigma=2, kernel="gaussian"
+        )
 
         sort_inds = torch.argsort(maskness, descending=True)
         if len(sort_inds) > 20:
@@ -175,7 +185,9 @@ if __name__ == "__main__":
         soft_masks = soft_masks[sort_inds]
         queries = queries[sort_inds]
 
-        soft_masks = F.interpolate(soft_masks[None, ...], size=(height, width), mode='bilinear')[0]
+        soft_masks = F.interpolate(
+            soft_masks[None, ...], size=(height, width), mode="bilinear"
+        )[0]
         masks = (soft_masks >= 0.5).float()
         sum_masks = masks.sum((1, 2))
 
@@ -185,13 +197,21 @@ if __name__ == "__main__":
         box_width, box_height = width_proj.sum(1), height_proj.sum(1)
         center_ws, _ = center_of_mass(width_proj[:, None, :])
         _, center_hs = center_of_mass(height_proj[:, :, None])
-        boxes = torch.stack([center_ws-0.5*box_width, center_hs-0.5*box_height, center_ws+0.5*box_width, center_hs+0.5*box_height], 1)
-        #boxes = []
-        #for mask in masks.cpu().numpy():
+        boxes = torch.stack(
+            [
+                center_ws - 0.5 * box_width,
+                center_hs - 0.5 * box_height,
+                center_ws + 0.5 * box_width,
+                center_hs + 0.5 * box_height,
+            ],
+            1,
+        )
+        # boxes = []
+        # for mask in masks.cpu().numpy():
         #    ys, xs = np.where(mask)
         #    box = [int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())]
         #    boxes.append(box)
-        #boxes = torch.tensor(boxes, device = maskness.device)
+        # boxes = torch.tensor(boxes, device = maskness.device)
 
         # filter masks on the top border or with large width
         keep = center_hs > 0.2 * height
@@ -207,42 +227,45 @@ if __name__ == "__main__":
         queries = queries[keep]
 
         # coco format
-        img_name = img_path.split('/')[-1].split('.')[0]
+        img_name = img_path.split("/")[-1].split(".")[0]
         try:
             img_id = int(img_name)
         except:
-            img_id = int(img_name.split('_')[-1])
-        cur_image_dict = {'file_name': img_path.split('/')[-1],
-                          'height': height,
-                          'width': width,
-                          'id':  img_id}
+            img_id = int(img_name.split("_")[-1])
+        cur_image_dict = {
+            "file_name": img_path.split("/")[-1],
+            "height": height,
+            "width": width,
+            "id": img_id,
+        }
         images_list.append(cur_image_dict)
-
 
         masks = masks.cpu().numpy()
         maskness = maskness.cpu().numpy()
         boxes = boxes.tolist()
         queries = queries.tolist()
-        rles = [mask_util.encode(np.array(mask[:, :, None], order="F", dtype="uint8"))[0]
-                            for mask in masks]
+        rles = [
+            mask_util.encode(np.array(mask[:, :, None], order="F", dtype="uint8"))[0]
+            for mask in masks
+        ]
         for idx in range(len(masks)):
             rle = rles[idx]
-            rle['counts'] = rle['counts'].decode('ascii')
-            cur_ann_dict = {'segmentation': rle,
-                            'bbox': boxes[idx],
-                            'score': float(maskness[idx]),
-                            'emb': queries[idx],
-                            'iscrowd': 0,
-                            'image_id': img_id,
-                            'category_id': 1,
-                            'id':  ann_id}
+            rle["counts"] = rle["counts"].decode("ascii")
+            cur_ann_dict = {
+                "segmentation": rle,
+                "bbox": boxes[idx],
+                "score": float(maskness[idx]),
+                "emb": queries[idx],
+                "iscrowd": 0,
+                "image_id": img_id,
+                "category_id": 1,
+                "id": ann_id,
+            }
             ann_id += 1
             anns_list.append(cur_ann_dict)
 
-
-    ann_dict['images'] = images_list
-    ann_dict['annotations'] = anns_list
-    json.dump(ann_dict, open(save_path, 'w'))
-    #json.dump(anns_list, open(save_path+'ann', 'w'))
+    ann_dict["images"] = images_list
+    ann_dict["annotations"] = anns_list
+    json.dump(ann_dict, open(save_path, "w"))
+    # json.dump(anns_list, open(save_path+'ann', 'w'))
     print("Done: {} images, {} annotations.".format(len(images_list), len(anns_list)))
-

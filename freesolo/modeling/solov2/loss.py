@@ -1,7 +1,7 @@
 # -------------------------------------------------------------------------
 # Copyright (c) 2019 the AdelaiDet authors
 # All rights reserved.
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
 #
@@ -59,7 +59,7 @@ def reduce_loss(loss, reduction):
         return loss.sum()
 
 
-def weight_reduce_loss(loss, weight=None, reduction='mean', avg_factor=None):
+def weight_reduce_loss(loss, weight=None, reduction="mean", avg_factor=None):
     """Apply element-wise weight and reduce loss.
     Args:
         loss (Tensor): Element-wise loss.
@@ -78,21 +78,17 @@ def weight_reduce_loss(loss, weight=None, reduction='mean', avg_factor=None):
         loss = reduce_loss(loss, reduction)
     else:
         # if reduction is mean, then average the loss by avg_factor
-        if reduction == 'mean':
+        if reduction == "mean":
             loss = loss.sum() / avg_factor
         # if reduction is 'none', then do nothing, otherwise raise an error
-        elif reduction != 'none':
+        elif reduction != "none":
             raise ValueError('avg_factor can not be used with reduction="sum"')
     return loss
 
 
-def sigmoid_focal_loss(pred,
-                       target,
-                       weight=None,
-                       gamma=2.0,
-                       alpha=0.25,
-                       reduction='mean',
-                       avg_factor=None):
+def sigmoid_focal_loss(
+    pred, target, weight=None, gamma=2.0, alpha=0.25, reduction="mean", avg_factor=None
+):
     # Function.apply does not accept keyword arguments, so the decorator
     # "weighted_loss" is not applicable
     loss = sigmoid_focal_loss_jit(pred, target, gamma=gamma, alpha=alpha)
@@ -115,30 +111,22 @@ def sigmoid_focal_loss(pred,
 
 
 class FocalLoss(nn.Module):
-
-    def __init__(self,
-                 use_sigmoid=True,
-                 gamma=2.0,
-                 alpha=0.25,
-                 reduction='mean',
-                 loss_weight=1.0):
+    def __init__(
+        self, use_sigmoid=True, gamma=2.0, alpha=0.25, reduction="mean", loss_weight=1.0
+    ):
         super(FocalLoss, self).__init__()
-        assert use_sigmoid is True, 'Only sigmoid focal loss supported now.'
+        assert use_sigmoid is True, "Only sigmoid focal loss supported now."
         self.use_sigmoid = use_sigmoid
         self.gamma = gamma
         self.alpha = alpha
         self.reduction = reduction
         self.loss_weight = loss_weight
 
-    def forward(self,
-                pred,
-                target,
-                weight=None,
-                avg_factor=None,
-                reduction_override=None):
-        assert reduction_override in (None, 'none', 'mean', 'sum')
-        reduction = (
-            reduction_override if reduction_override else self.reduction)
+    def forward(
+        self, pred, target, weight=None, avg_factor=None, reduction_override=None
+    ):
+        assert reduction_override in (None, "none", "mean", "sum")
+        reduction = reduction_override if reduction_override else self.reduction
         if self.use_sigmoid:
             loss_cls = self.loss_weight * sigmoid_focal_loss(
                 pred,
@@ -147,7 +135,8 @@ class FocalLoss(nn.Module):
                 gamma=self.gamma,
                 alpha=self.alpha,
                 reduction=reduction,
-                avg_factor=avg_factor)
+                avg_factor=avg_factor,
+            )
         else:
             raise NotImplementedError
         return loss_cls
