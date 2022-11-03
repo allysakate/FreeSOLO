@@ -165,3 +165,13 @@ register_coco_instances("mots_val",
                         {},
                         os.path.join(_root, "mots/annotations/mots_val.json"), 
                         os.path.join(_root, "mots/"))
+
+register_coco_instances("coco_train",
+                        {},
+                        os.path.join(_root, "coco/annotations/selected_instances_train2017.json"), 
+                        os.path.join(_root, "coco/train2017/"))
+
+register_coco_instances("coco_val",
+                        {},
+                        os.path.join(_root, "coco/annotations/selected_instances_val2017.json"), 
+                        os.path.join(_root, "coco/val2017/"))
